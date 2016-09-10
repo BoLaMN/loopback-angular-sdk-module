@@ -17,6 +17,34 @@ angular.module 'loopback.sdk', [ 'ngResource' ]
   # @param {!Function} $resource The angular $resource service.
   ###
 
+  class ApiEndpoint
+    constructor: (data = {}) ->
+      for own key, value of data
+        @[key] = value
+
+  createClass = (name) ->
+    name ?= ApiEndpoint.name
+    args = ('a' + i for i in [1..ApiEndpoint.length]).join(', ')
+
+    fnString = """
+        return function (call) {
+            return function #{name}(#{args}) {
+                return call.apply(this, arguments)
+            };
+        };
+    """
+
+    newClass = (new Function(fnString)())(ApiEndpoint)
+
+    F = ->
+
+    F:: = Object.getPrototypeOf ApiEndpoint.prototype
+
+    newClass:: = new F()
+    newClass.prototype.constructor = newClass
+
+    newClass
+
   define = (item, prop, desc) ->
     Object.defineProperty item, prop,
       writable: false
@@ -33,7 +61,7 @@ angular.module 'loopback.sdk', [ 'ngResource' ]
     request = (action, params, data) ->
       resource[action](params, data).$promise
 
-    newClass = ->
+    newClass = createClass modelName
 
     methods = Object.keys config.methods
 
