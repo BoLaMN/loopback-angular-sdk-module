@@ -4,7 +4,7 @@ angular.module 'loopback.sdk', [ 'ngResource' ]
 
 .provider 'Resource', ($provide, $injector) ->
   baseRoute = ''
-  config = {}
+  baseConfig = {}
 
   ###*
   # An api endpoint.
@@ -51,7 +51,7 @@ angular.module 'loopback.sdk', [ 'ngResource' ]
       enumerable: false
       value: desc
 
-  createApiEndPoint = (modelName, baseRoute, config, $injector, $resource) ->
+  createApiEndPoint = (modelName, baseConfig, baseRoute, config, $injector, $resource) ->
     resource = $resource baseRoute + config.url, config.params, config.methods
 
     resource::$save = (success, error) ->
@@ -62,6 +62,8 @@ angular.module 'loopback.sdk', [ 'ngResource' ]
       resource[action](params, data).$promise
 
     newClass = createClass modelName
+
+    define newClass, 'properties', baseConfig.models[modelName].properties
 
     methods = Object.keys config.methods
 
@@ -76,7 +78,7 @@ angular.module 'loopback.sdk', [ 'ngResource' ]
         define newClass, aliasName, angular.bind(this, request, config.methods[methodName])
 
     angular.forEach config.scopes, (scope, scopeName) ->
-      define newClass, scopeName, createApiEndPoint scope.model, baseRoute, scope, $injector, $resource
+      define newClass, scopeName, createApiEndPoint scope.model, baseConfig, baseRoute, scope, $injector, $resource
 
     newClass
 
@@ -91,21 +93,18 @@ angular.module 'loopback.sdk', [ 'ngResource' ]
 
   setConfig: (newConfig) ->
     console.log 'config', newConfig
-    config = newConfig
+    baseConfig = newConfig
 
   registerModels: (url) ->
     if url
       baseRoute = url
 
-    console.log 'running with ', + url
-
-    Object.keys(config.models).forEach (modelName) ->
-      console.log 'registering ' + modelName
-      endpointConfig = config.models[modelName]
+    Object.keys(baseConfig.models).forEach (modelName) ->
+      endpointConfig = baseConfig.models[modelName]
 
       $provide.factory modelName, [
         '$injector', '$resource', ($injector, $resource) ->
-          createApiEndPoint modelName, baseRoute, endpointConfig, $injector, $resource
+          createApiEndPoint modelName, baseConfig, baseRoute, endpointConfig, $injector, $resource
       ]
 
       return
