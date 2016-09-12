@@ -22,6 +22,14 @@ angular.module 'loopback.sdk', [ 'ngResource' ]
       for own key, value of data
         @[key] = value
 
+      for own key, value of @defaults
+        if angular.isUndefined @[key]
+          @[key] = value
+
+      for own key, value of @properties
+        if angular.isUndefined(@[key]) and Array.isArray value.type
+          @[key] = []
+
   createClass = (name) ->
     name ?= ApiEndpoint.name
     args = ('a' + i for i in [1..ApiEndpoint.length]).join(', ')
@@ -62,23 +70,33 @@ angular.module 'loopback.sdk', [ 'ngResource' ]
       resource[action](params, data).$promise
 
     newClass = createClass modelName
+    baseModel = baseConfig.models[modelName] or {}
 
-    define newClass, 'properties', baseConfig.models[modelName].properties
+    properties = baseModel.properties or {}
+    defaults = {}
 
-    methods = Object.keys config.methods
+    if angular.isObject properties
+      angular.forEach properties, (property, propertyName) ->
+        if property.default
+          defaults[propertyName] = property.default
 
-    methods.forEach (mthd) ->
-      config.methods[mthd].url = baseRoute + config.methods[mthd].url
+    define newClass.prototype, 'properties', properties
+    define newClass.prototype, 'defaults', defaults
 
-    angular.forEach config.methods, (action, actionName) ->
-      define newClass, actionName, angular.bind(this, request, actionName)
+    if angular.isObject config.methods
+      angular.forEach config.methods, (method, name) ->
+        config.methods[name].url = baseRoute + method.url
+
+      angular.forEach config.methods, (action, actionName) ->
+        define newClass, actionName, angular.bind(this, request, actionName)
 
     if angular.isObject config.aliases
       angular.forEach config.aliases, (methodName, aliasName) ->
         define newClass, aliasName, angular.bind(this, request, config.methods[methodName])
 
-    angular.forEach config.scopes, (scope, scopeName) ->
-      define newClass, scopeName, createApiEndPoint scope.model, baseConfig, baseRoute, scope, $injector, $resource
+    if angular.isObject config.scopes
+      angular.forEach config.scopes, (scope, scopeName) ->
+        define newClass, scopeName, createApiEndPoint scope.model, baseConfig, baseRoute, scope, $injector, $resource
 
     newClass
 
