@@ -15,34 +15,30 @@ angular.module 'loopback.sdk', [ 'ngResource' ]
     next = ->
       index = (index + 1) % 0xFFFFFF
 
-    generate = (time) ->
-      if typeof time != 'number'
-        time = Date.now() / 1000
-
-      time = parseInt(time, 10) % 0xFFFFFFFF
+    generate = ->
+      time = parseInt((Date.now() / 1000), 10) % 0xFFFFFFFF
 
       hex(8, time) + hex(6, id) + hex(4, pid) + hex(6, next())
 
     hex = (length, n) ->
       n = n.toString(16)
-      if n.length == length then n else '00000000'.substring(n.length, length) + n
+
+      if n.length is length
+        n
+      else
+        '00000000'.substring(n.length, length) + n
 
     buffer = (str) ->
       i = 0
       out = []
 
-      if str.length == 24
-        while i < 24
-          out.push(parseInt(str[i] + str[i + 1], 16))
-          i += 2
-      else if str.length == 12
-        while i < 12
-          out.push(str.charCodeAt(i))
-          i++
+      while i < 24
+        out.push(parseInt(str[i] + str[i + 1], 16))
+        i += 2
+
       out
 
-    buf = buffer generate()
-    buf.map(hex.bind(this, 2)).join ''
+    buffer(generate()).map(hex.bind(this, 2)).join ''
 
   class ApiEndpoint
     constructor: (data = {}) ->
