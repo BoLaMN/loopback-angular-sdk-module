@@ -6,16 +6,43 @@ angular.module 'loopback.sdk', [ 'ngResource' ]
   baseRoute = ''
   baseConfig = {}
 
-  ###*
-  # An api endpoint.
-  #
-  # @constructor
-  # @param {string} baseRoute The server api's base route.
-  # @param {ApiEndpointConfig} config Configuration object for the
-  #     endpoint.
-  # @param {!Object} $injector The angular $injector service.
-  # @param {!Function} $resource The angular $resource service.
-  ###
+  id = parseInt(Math.random() * 0xFFFFFF, 10)
+  index = parseInt(Math.random() * 0xFFFFFF, 10)
+  pid = Math.floor(Math.random() * 100000) % 0xFFFF
+
+  ObjectId = ->
+
+    next = ->
+      index = (index + 1) % 0xFFFFFF
+
+    generate = (time) ->
+      if typeof time != 'number'
+        time = Date.now() / 1000
+
+      time = parseInt(time, 10) % 0xFFFFFFFF
+
+      hex(8, time) + hex(6, id) + hex(4, pid) + hex(6, next())
+
+    hex = (length, n) ->
+      n = n.toString(16)
+      if n.length == length then n else '00000000'.substring(n.length, length) + n
+
+    buffer = (str) ->
+      i = 0
+      out = []
+
+      if str.length == 24
+        while i < 24
+          out.push(parseInt(str[i] + str[i + 1], 16))
+          i += 2
+      else if str.length == 12
+        while i < 12
+          out.push(str.charCodeAt(i))
+          i++
+      out
+
+    buf = buffer generate()
+    buf.map(hex.bind(this, 2)).join ''
 
   class ApiEndpoint
     constructor: (data = {}) ->
@@ -24,7 +51,7 @@ angular.module 'loopback.sdk', [ 'ngResource' ]
 
       for own key, value of @defaults
         if angular.isUndefined @[key]
-          @[key] = value
+          @[key] = value()
 
       for own key, value of @properties
         if angular.isUndefined(@[key]) and Array.isArray value.type
@@ -63,11 +90,12 @@ angular.module 'loopback.sdk', [ 'ngResource' ]
     resource = $resource baseRoute + config.url, config.params, config.methods
 
     resource::$save = (success, error) ->
-      action = if @id then '$replaceById' else '$create'
-      @[action]()
+      @$patchOrCreate()
 
-    request = (action, params, data) ->
-      resource[action](params, data).$promise
+    request = (action, args...) ->
+      result = resource[action].call(this, args...)
+
+      result.$promise or result
 
     newClass = createClass modelName
     baseModel = baseConfig.models[modelName] or {}
@@ -77,8 +105,12 @@ angular.module 'loopback.sdk', [ 'ngResource' ]
 
     if angular.isObject properties
       angular.forEach properties, (property, propertyName) ->
+        if Boolean(property.id) and property.type in [ '', 'ObjectID' ]
+          defaults[propertyName] = ObjectId
+
         if property.default
-          defaults[propertyName] = property.default
+          defaults[propertyName] = ->
+            property.default
 
     define newClass.prototype, 'properties', properties
     define newClass.prototype, 'defaults', defaults
@@ -99,11 +131,6 @@ angular.module 'loopback.sdk', [ 'ngResource' ]
         define newClass, scopeName, createApiEndPoint scope.model, baseConfig, baseRoute, scope, $injector, $resource
 
     newClass
-
-  ###*
-  # Function invoked by angular to get the instance of the api service.
-  # @return {Object.<string, ApiEndpoint>} The set of all api endpoints.
-  ###
 
   setBaseRoute: (url) ->
     console.log 'setBaseRoute', url
